@@ -361,24 +361,6 @@ local function queueFunc()
 	end
 end
 local function armTeleport(silent)
-	local source = getgenv().ThaBooSource
-	if type(source) ~= "string" or #source < 50 then
-		if not silent then
-			notify("Could not save the script for teleport")
-		end
-		return
-	end
-	local wrote = false
-	pcall(function()
-		if not writefile then
-			error("no writefile")
-		end
-		if makefolder and not (isfolder and isfolder("ThaBoo")) then
-			makefolder("ThaBoo")
-		end
-		writefile("ThaBoo/Dimensions.lua", source)
-		wrote = true
-	end)
 	local queue = queueFunc()
 	if not queue then
 		if not silent then
@@ -386,29 +368,23 @@ local function armTeleport(silent)
 		end
 		return
 	end
-	local body
-	if wrote then
-		body = table.concat({
-			"repeat task.wait() until game:IsLoaded()",
-			"task.wait(2)",
-			"local plr = game:GetService('Players').LocalPlayer",
-			"local t0 = os.clock()",
-			"while plr and not plr.Character and os.clock() - t0 < 10 do task.wait(0.2) end",
-			"task.wait(1)",
-			"if getgenv().ThaBooRunning then return end",
-			"if not (isfile and readfile and isfile('ThaBoo/exec_on_tp.txt') and readfile('ThaBoo/exec_on_tp.txt') == '1' and isfile('ThaBoo/Dimensions.lua')) then return end",
-			"loadstring(readfile('ThaBoo/Dimensions.lua'))()",
-		}, "\n")
-	else
-		body = "repeat task.wait() until game:IsLoaded()\ntask.wait(3)\nif getgenv().ThaBooRunning then return end\ngetgenv().ThaBooSource = "
-			.. string.format("%q", source) .. "\nloadstring(getgenv().ThaBooSource)()"
-	end
+	local body = table.concat({
+		"repeat task.wait() until game:IsLoaded()",
+		"task.wait(2)",
+		"local plr = game:GetService('Players').LocalPlayer",
+		"local t0 = os.clock()",
+		"while plr and not plr.Character and os.clock() - t0 < 10 do task.wait(0.2) end",
+		"task.wait(1)",
+		"if getgenv().ThaBooRunning then return end",
+		"if not (isfile and readfile and isfile('ThaBoo/exec_on_tp.txt') and readfile('ThaBoo/exec_on_tp.txt') == '1') then return end",
+		"loadstring(game:HttpGet('https://raw.githubusercontent.com/S1n-script/Demension/refs/heads/main/README.md'))()",
+	}, "\n")
 	local ok, err = pcall(queue, body)
 	if silent then
 		return
 	end
 	if ok then
-		notify(wrote and "Saved. It will run again after teleport." or "Queued. It will run again after teleport.")
+		notify("Queued. It will pull the latest script after teleport.")
 	else
 		notify("Queue failed: " .. tostring(err))
 	end
@@ -1082,7 +1058,6 @@ local function hookRetry()
 		task.spawn(onResults)
 	end
 end
--- Start raid if we just arrived in the raid lobby
 if flagOn("pending_raid") and game.PlaceId == RAID_LOBBY_ID then
 	task.delay(4, function()
 		setFlag("pending_raid", false)
