@@ -47,7 +47,6 @@ local friendsOnly = false
 local nextAttack = 0
 local nextBasic = 0
 local dodgePos
-local holdUntil = 0
 local threats = {}
 local debrisHooked = false
 local cachedBoss
@@ -78,6 +77,7 @@ local DODGE_SMOOTH_TIME = 0.05
 local FARM_GOAL_RESPONSE = 26
 local DODGE_GOAL_RESPONSE = 32
 local TURN_RESPONSE = 18
+local MELEE_DODGE_RANGE = 14
 local function track(conn)
 	table.insert(conns, conn)
 	return conn
@@ -569,6 +569,27 @@ local function livingMobs()
 	end
 	return list
 end
+local function nearbyThreatMob()
+	local root = getRoot()
+	if not root then return nil end
+	local folders = workspace:FindFirstChild("Folders")
+	local monsters = folders and folders:FindFirstChild("Monsters")
+	if not monsters then return nil end
+	local closest, closestDist
+	for _, mob in ipairs(monsters:GetChildren()) do
+		if isAliveMob(mob) and mob ~= currentMob then
+			local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+			if mobRoot then
+				local dist = (mobRoot.Position - root.Position).Magnitude
+				if dist < MELEE_DODGE_RANGE and (not closestDist or dist < closestDist) then
+					closest = mob
+					closestDist = dist
+				end
+			end
+		end
+	end
+	return closest
+end
 local function findBoss()
 	local frame = bossFrame()
 	local barOn = frame and frame.Visible
@@ -676,7 +697,6 @@ end
 local function releaseStick()
 	currentMob = nil
 	dodgePos = nil
-	holdUntil = 0
 	resetMotion()
 	noclip(false)
 	local humanoid = getHumanoid()
@@ -725,7 +745,6 @@ local function registerThreat(inst)
 		bornSize = size,
 		look = flatDir(inst.CFrame.LookVector),
 		circle = inst.Name == "CirclePart" or (size.X <= 2 and size.Y <= 2 and size.Z <= 1),
-		linger = (size.X >= 70 and size.Y <= 0.2 and size.Z < 7) and 2.4 or 1.6,
 	}
 end
 local function watchDebris()
@@ -756,9 +775,6 @@ local function threatHits(point, part, rec)
 	if not part.Parent then
 		return false
 	end
-	if os.clock() - rec.born > 1.4 then
-		return false
-	end
 	local flatPoint = flat(point)
 	if rec.circle or part.Name == "CirclePart" then
 		return (flatPoint - flat(part.Position)).Magnitude <= circleRadius(part, rec)
@@ -772,9 +788,9 @@ local function threatHits(point, part, rec)
 	local side = (delta - look * along).Magnitude
 	return along >= -8 and along <= length + 8 and side <= part.Size.X * 0.5 + 5
 end
-local function spotHits(point)
+local function threatsBlocking(point)
 	for part, rec in pairs(threats) do
-		if threatHits(point, part, rec) then
+		if part.Parent and threatHits(point, part, rec) then
 			return true
 		end
 	end
@@ -783,44 +799,18 @@ end
 local function hitCount(point)
 	local count = 0
 	for part, rec in pairs(threats) do
-		if threatHits(point, part, rec) then
+		if part.Parent and threatHits(point, part, rec) then
 			count = count + 1
 		end
 	end
 	return count
 end
-local function lingerNow()
-	local linger = 0.18
-	for _, rec in pairs(threats) do
-		if rec.linger > linger then
-			linger = rec.linger
-		end
-	end
-	return linger
-end
 local function dodgeSpot(anchor, preferred)
-	local count = 0
-	for part in pairs(threats) do
-		if part.Parent then
-			count = count + 1
-		end
-	end
-	if not spotHits(preferred) then
-		dodgePos = nil
-		holdUntil = 0
-		return preferred
-	end
-	if count > 0 then
-		holdUntil = os.clock() + math.max(lingerNow(), 2.2)
-	end
-	if count == 0 then
-		if os.clock() < holdUntil and dodgePos then
-			return dodgePos
-		end
+	if not threatsBlocking(preferred) then
 		dodgePos = nil
 		return preferred
 	end
-	if dodgePos and not spotHits(dodgePos) and (dodgePos - anchor).Magnitude <= 70 then
+	if dodgePos and not threatsBlocking(dodgePos) and (dodgePos - anchor).Magnitude <= 70 then
 		return dodgePos
 	end
 	local bestSafe, bestSafeDist
@@ -1169,7 +1159,6 @@ end })
 Farm:CreateToggle({ name = "Auto Dodge", value = false, flag = "SmartDodge", callback = function(value)
 	autoDodge = value
 	dodgePos = nil
-	holdUntil = 0
 end })
 Farm:CreateToggle({ name = "Auto Retry", value = false, flag = "AutoRetry", callback = function(value)
 	autoRetry = value
@@ -1461,6 +1450,18 @@ track(RunService.Heartbeat:Connect(function(dt)
 			if stand.Y < minY then
 				stand = Vector3.new(stand.X, minY, stand.Z)
 			end
+		end
+		local threatMob = nearbyThreatMob()
+		if threatMob then
+			local mobRoot = threatMob.HumanoidRootPart
+			local away = root.Position - mobRoot.Position
+			if away.Magnitude < 1 then
+				away = Vector3.new(1, 0, 0)
+			end
+			local dodgeTarget = root.Position + away.Unit * 18
+			stand = dodgeTarget
+			speed = DODGE_SPEED
+			dodging = true
 		end
 	else
 		dodgePos = nil
