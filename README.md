@@ -1468,6 +1468,11 @@ task.spawn(function()
 						invoke("TeleportToBossRush")
 					end)
 				end
+			elseif chosen == "Dimension" and autoExtreme and (now - lastBossAttempt) > 6 then
+				lastBossAttempt = now
+				pcall(function()
+					invoke("TeleportToExtremeDimension", extremeDifficulty)
+				end)
 			end
 		else
 			if autoRaid and raidIsOpen() and not resultsOpen() and not flagOn("pending_raid") and not inRaidLobby and (now - lastRaidAttempt) > 15 then
@@ -1496,12 +1501,12 @@ task.spawn(function()
 					invoke("TeleportToBossRush")
 				end)
 			end
-		end
-		if autoExtreme and (now - lastRaidAttempt) > 6 then
-			lastRaidAttempt = now
-			pcall(function()
-				invoke("TeleportToExtremeDimension", extremeDifficulty)
-			end)
+			if autoExtreme and (now - lastRaidAttempt) > 6 then
+				lastRaidAttempt = now
+				pcall(function()
+					invoke("TeleportToExtremeDimension", extremeDifficulty)
+				end)
+			end
 		end
 		task.wait(1.5)
 	end
