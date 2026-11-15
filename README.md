@@ -71,7 +71,6 @@ local priorities = { Dimension = 4, SpeedRaid = 5, BossRush = 6, Raid = 8 }
 local usedMains = {}
 local RAID_LOBBY_ID = 7338881230
 local afterSpeedLoadout = 0
-local wasSpeedRaid = false
 local FARM_SPEED = 80
 local DODGE_SPEED = 150
 local FARM_SMOOTH_TIME = 0.08
@@ -478,10 +477,11 @@ local function startMap(mapName, difficulty, useHardcore)
 		Hardcore = useHardcore and true or false,
 		FriendsOnly = friendsOnly and true or false,
 	}) then
-		return
+		return false
 	end
 	task.wait(0.4)
 	invoke("TeleportPlayers")
+	return true
 end
 local function equipLoadout(index)
 	if index < 1 or index > 3 then return end
@@ -895,9 +895,7 @@ local function resultsOpen()
 	return false
 end
 local function raidIsOpen()
-	local now = math.floor(workspace:GetServerTimeNow())
-	local secondsIntoHour = now % 3600
-	return secondsIntoHour < 600
+	return true
 end
 local function setSelected(option)
 	selected = {}
@@ -1037,8 +1035,8 @@ local function hookRetry()
 		if leaveAfter > 0 then
 			notify("Run " .. runsDone .. " / " .. leaveAfter)
 		end
-		if wasSpeedRaid and afterSpeedLoadout > 0 then
-			wasSpeedRaid = false
+		if flagOn("was_speed_raid") and afterSpeedLoadout > 0 then
+			setFlag("was_speed_raid", false)
 			task.wait(0.5)
 			equipLoadout(afterSpeedLoadout)
 		end
@@ -1073,11 +1071,15 @@ local function hookRetry()
 	end
 end
 if flagOn("pending_raid") and game.PlaceId == RAID_LOBBY_ID then
-	task.delay(4, function()
-		setFlag("pending_raid", false)
-		if raidPick then
-			startMap(raidPick, raidDifficulty, false)
+	task.delay(8, function()
+		local ok = pcall(function()
+			return startMap(raidPick, raidDifficulty, false)
+		end)
+		if ok then
+			setFlag("pending_raid", false)
 			notify("Starting raid: " .. tostring(raidPick))
+		else
+			notify("Raid start failed, will retry")
 		end
 	end)
 end
@@ -1452,7 +1454,7 @@ task.spawn(function()
 				lastSpeedAttempt = now
 				local char = pickSpeedCharacter()
 				if char then
-					wasSpeedRaid = true
+					setFlag("was_speed_raid", true)
 					pcall(function()
 						invoke("TeleportToShadowRaid", char)
 					end)
@@ -1480,7 +1482,7 @@ task.spawn(function()
 				lastSpeedAttempt = now
 				local char = pickSpeedCharacter()
 				if char then
-					wasSpeedRaid = true
+					setFlag("was_speed_raid", true)
 					pcall(function()
 						invoke("TeleportToShadowRaid", char)
 					end)
