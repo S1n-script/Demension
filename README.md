@@ -628,9 +628,19 @@ local function farmTarget()
 	nextBossProbe = os.clock() + 0.3
 	return currentMob
 end
+local function getRaidCenter()
+	local map = workspace:FindFirstChild("GameMap")
+	if not map then return nil end
+	for _, child in ipairs(map:GetChildren()) do
+		local pos = child:FindFirstChild("CenterAttackPositioner")
+		if pos and pos:IsA("BasePart") then
+			return pos.Position
+		end
+	end
+end
 local function preferredPos(enemyRoot, dt)
 	if method == "Above" then
-		return enemyRoot.Position + Vector3.new(0, distance, 0)
+		return enemyRoot.Position + Vector3.new(0, math.max(distance, 12), 0)
 	elseif method == "Circling" then
 		circleAngle = circleAngle + (CIRCLE_SPEED * (dt or 0.016))
 		local x = math.cos(circleAngle) * distance
@@ -686,17 +696,23 @@ local function flatDir(dir)
 	return horizontal.Unit
 end
 local function isMarker(inst)
-	if not (inst:IsA("BasePart") and inst.Anchored and inst.Material == Enum.Material.Neon) then
+	if not (inst:IsA("BasePart") and inst.Anchored) then
+		return false
+	end
+	local c = inst.Color
+	local isPurple = c.R > 0.35 and c.B > 0.35 and c.G < 0.35
+	local isNeon = inst.Material == Enum.Material.Neon
+	if not (isNeon or isPurple) then
 		return false
 	end
 	if inst.Name == "CirclePart" then
 		return true
 	end
 	local size = inst.Size
-	if size.X <= 1.2 and size.Y <= 1.2 and size.Z <= 0.3 then
+	if size.X <= 2 and size.Y <= 2 and size.Z <= 1 then
 		return true
 	end
-	return size.Y <= 0.2 and size.X >= 6
+	return size.Y <= 0.3 and size.X >= 5
 end
 local function registerThreat(inst)
 	if not isMarker(inst) then
@@ -708,7 +724,7 @@ local function registerThreat(inst)
 		born = os.clock(),
 		bornSize = size,
 		look = flatDir(inst.CFrame.LookVector),
-		circle = inst.Name == "CirclePart" or (size.X <= 1.2 and size.Y <= 1.2 and size.Z <= 0.3),
+		circle = inst.Name == "CirclePart" or (size.X <= 2 and size.Y <= 2 and size.Z <= 1),
 		linger = (size.X >= 70 and size.Y <= 0.2 and size.Z < 7) and 2.4 or 1.6,
 	}
 end
@@ -895,7 +911,22 @@ local function resultsOpen()
 	return false
 end
 local function raidIsOpen()
-	return true
+	local circles = workspace:FindFirstChild("InteractionCircles")
+	local portal = circles and circles:FindFirstChild("RaidPortal")
+	local timer = portal and portal:FindFirstChild("RaidTimer")
+	local frame = timer and timer:FindFirstChild("Frame")
+	local text = frame and frame:FindFirstChild("RaidTimerText")
+	if text and text:IsA("TextLabel") then
+		local t = text.Text:lower()
+		if t:find("open") or t:find("available") or t == "0:00" or t == "00:00" then
+			return true
+		end
+		local mins = t:match("(%d+):")
+		if mins and tonumber(mins) and tonumber(mins) < 2 then
+			return true
+		end
+	end
+	return false
 end
 local function setSelected(option)
 	selected = {}
@@ -1404,6 +1435,17 @@ track(RunService.Heartbeat:Connect(function(dt)
 	end
 	local enemyRoot = target.HumanoidRootPart
 	local stand = preferredPos(enemyRoot, dt)
+	local center = getRaidCenter()
+	if center then
+		local minY = center.Y + 15
+		if stand.Y < minY then
+			stand = Vector3.new(stand.X, minY, stand.Z)
+		end
+	end
+	local rootY = root.Position.Y
+	if stand.Y < rootY - 4 then
+		stand = Vector3.new(stand.X, rootY - 2, stand.Z)
+	end
 	local dodging = false
 	local speed = FARM_SPEED
 	if autoDodge then
@@ -1414,6 +1456,12 @@ track(RunService.Heartbeat:Connect(function(dt)
 			speed = DODGE_SPEED
 		end
 		stand = safePos
+		if center then
+			local minY = center.Y + 15
+			if stand.Y < minY then
+				stand = Vector3.new(stand.X, minY, stand.Z)
+			end
+		end
 	else
 		dodgePos = nil
 	end
@@ -1443,7 +1491,7 @@ task.spawn(function()
 		local inRaidLobby = game.PlaceId == RAID_LOBBY_ID
 		if priorityEnabled then
 			local chosen = highestAvailable()
-			if chosen == "Raid" and not resultsOpen() and not flagOn("pending_raid") and not inRaidLobby and (now - lastRaidAttempt) > 15 then
+			if chosen == "Raid" and not resultsOpen() and not flagOn("pending_raid") and not inRaidLobby and (now - lastRaidAttempt) > 12 then
 				lastRaidAttempt = now
 				setFlag("pending_raid", true)
 				notify("Going to raid lobby...")
@@ -1475,7 +1523,7 @@ task.spawn(function()
 				end)
 			end
 		else
-			if autoRaid and raidIsOpen() and not resultsOpen() and not flagOn("pending_raid") and not inRaidLobby and (now - lastRaidAttempt) > 15 then
+			if autoRaid and raidIsOpen() and not resultsOpen() and not flagOn("pending_raid") and not inRaidLobby and (now - lastRaidAttempt) > 12 then
 				lastRaidAttempt = now
 				setFlag("pending_raid", true)
 				notify("Going to raid lobby...")
