@@ -70,6 +70,8 @@ local lastResultCount = 0
 local priorities = { Dimension = 4, SpeedRaid = 5, BossRush = 6, Raid = 8 }
 local usedMains = {}
 local RAID_LOBBY_ID = 7338881230
+local afterSpeedLoadout = 0
+local wasSpeedRaid = false
 local FARM_SPEED = 80
 local DODGE_SPEED = 150
 local FARM_SMOOTH_TIME = 0.08
@@ -480,6 +482,13 @@ local function startMap(mapName, difficulty, useHardcore)
 	end
 	task.wait(0.4)
 	invoke("TeleportPlayers")
+end
+local function equipLoadout(index)
+	if index < 1 or index > 3 then return end
+	pcall(function()
+		invoke("SwitchLoadout", index)
+		notify("Equipped Loadout " .. index)
+	end)
 end
 local function getHumanoid()
 	local character = LocalPlayer.Character
@@ -1028,6 +1037,11 @@ local function hookRetry()
 		if leaveAfter > 0 then
 			notify("Run " .. runsDone .. " / " .. leaveAfter)
 		end
+		if wasSpeedRaid and afterSpeedLoadout > 0 then
+			wasSpeedRaid = false
+			task.wait(0.5)
+			equipLoadout(afterSpeedLoadout)
+		end
 		if leaveAfter > 0 and runsDone >= leaveAfter then
 			task.wait(1.2)
 			if not alive then return end
@@ -1261,6 +1275,25 @@ Lobby:CreateToggle({
 		autoSpeedRaid = value
 	end,
 })
+Lobby:CreateDropdown({
+	name = "After Speed Raid Loadout",
+	options = { "Off", "Loadout 1", "Loadout 2", "Loadout 3" },
+	value = "Off",
+	multiSelect = false,
+	flag = "AfterSpeedLoadout",
+	callback = function(option)
+		local pick = one(option)
+		if pick == "Loadout 1" then
+			afterSpeedLoadout = 1
+		elseif pick == "Loadout 2" then
+			afterSpeedLoadout = 2
+		elseif pick == "Loadout 3" then
+			afterSpeedLoadout = 3
+		else
+			afterSpeedLoadout = 0
+		end
+	end,
+})
 Lobby:CreateSection({ name = "Other" })
 Lobby:CreateToggle({
 	name = "Auto Boss Rush",
@@ -1419,6 +1452,7 @@ task.spawn(function()
 				lastSpeedAttempt = now
 				local char = pickSpeedCharacter()
 				if char then
+					wasSpeedRaid = true
 					pcall(function()
 						invoke("TeleportToShadowRaid", char)
 					end)
@@ -1446,6 +1480,7 @@ task.spawn(function()
 				lastSpeedAttempt = now
 				local char = pickSpeedCharacter()
 				if char then
+					wasSpeedRaid = true
 					pcall(function()
 						invoke("TeleportToShadowRaid", char)
 					end)
