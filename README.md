@@ -78,6 +78,7 @@ local FARM_GOAL_RESPONSE = 26
 local DODGE_GOAL_RESPONSE = 32
 local TURN_RESPONSE = 18
 local MELEE_DODGE_RANGE = 14
+local FLOOR_Y = 5
 local function track(conn)
 	table.insert(conns, conn)
 	return conn
@@ -649,19 +650,9 @@ local function farmTarget()
 	nextBossProbe = os.clock() + 0.3
 	return currentMob
 end
-local function getRaidCenter()
-	local map = workspace:FindFirstChild("GameMap")
-	if not map then return nil end
-	for _, child in ipairs(map:GetChildren()) do
-		local pos = child:FindFirstChild("CenterAttackPositioner")
-		if pos and pos:IsA("BasePart") then
-			return pos.Position
-		end
-	end
-end
 local function preferredPos(enemyRoot, dt)
 	if method == "Above" then
-		return enemyRoot.Position + Vector3.new(0, math.max(distance, 12), 0)
+		return enemyRoot.Position + Vector3.new(0, distance, 0)
 	elseif method == "Circling" then
 		circleAngle = circleAngle + (CIRCLE_SPEED * (dt or 0.016))
 		local x = math.cos(circleAngle) * distance
@@ -816,11 +807,8 @@ local function dodgeSpot(anchor, preferred)
 	local bestSafe, bestSafeDist
 	local bestAny, bestAnyCount, bestAnyDist
 	local function consider(pos)
-		local minY = anchor.Y
-		if pos.Y < minY then
-			pos = Vector3.new(pos.X, minY, pos.Z)
-		else
-			pos = Vector3.new(pos.X, math.max(pos.Y, minY), pos.Z)
+		if pos.Y < FLOOR_Y then
+			pos = Vector3.new(pos.X, FLOOR_Y, pos.Z)
 		end
 		if (Vector3.new(pos.X, anchor.Y, pos.Z) - anchor).Magnitude > 86 then
 			return
@@ -1430,16 +1418,8 @@ track(RunService.Heartbeat:Connect(function(dt)
 	end
 	local enemyRoot = target.HumanoidRootPart
 	local stand = preferredPos(enemyRoot, dt)
-	local center = getRaidCenter()
-	if center then
-		local minY = center.Y + 15
-		if stand.Y < minY then
-			stand = Vector3.new(stand.X, minY, stand.Z)
-		end
-	end
-	local rootY = root.Position.Y
-	if stand.Y < rootY - 4 then
-		stand = Vector3.new(stand.X, rootY - 2, stand.Z)
+	if stand.Y < FLOOR_Y then
+		stand = Vector3.new(stand.X, FLOOR_Y, stand.Z)
 	end
 	local dodging = false
 	local speed = FARM_SPEED
@@ -1451,11 +1431,8 @@ track(RunService.Heartbeat:Connect(function(dt)
 			speed = DODGE_SPEED
 		end
 		stand = safePos
-		if center then
-			local minY = center.Y + 15
-			if stand.Y < minY then
-				stand = Vector3.new(stand.X, minY, stand.Z)
-			end
+		if stand.Y < FLOOR_Y then
+			stand = Vector3.new(stand.X, FLOOR_Y, stand.Z)
 		end
 		local threatMob = nearbyThreatMob()
 		if threatMob then
