@@ -78,7 +78,6 @@ local FARM_GOAL_RESPONSE = 26
 local DODGE_GOAL_RESPONSE = 32
 local TURN_RESPONSE = 18
 local MELEE_DODGE_RANGE = 14
-local FLOOR_Y = 5
 local function track(conn)
 	table.insert(conns, conn)
 	return conn
@@ -807,9 +806,6 @@ local function dodgeSpot(anchor, preferred)
 	local bestSafe, bestSafeDist
 	local bestAny, bestAnyCount, bestAnyDist
 	local function consider(pos)
-		if pos.Y < FLOOR_Y then
-			pos = Vector3.new(pos.X, FLOOR_Y, pos.Z)
-		end
 		if (Vector3.new(pos.X, anchor.Y, pos.Z) - anchor).Magnitude > 86 then
 			return
 		end
@@ -1418,9 +1414,6 @@ track(RunService.Heartbeat:Connect(function(dt)
 	end
 	local enemyRoot = target.HumanoidRootPart
 	local stand = preferredPos(enemyRoot, dt)
-	if stand.Y < FLOOR_Y then
-		stand = Vector3.new(stand.X, FLOOR_Y, stand.Z)
-	end
 	local dodging = false
 	local speed = FARM_SPEED
 	if autoDodge then
@@ -1431,9 +1424,6 @@ track(RunService.Heartbeat:Connect(function(dt)
 			speed = DODGE_SPEED
 		end
 		stand = safePos
-		if stand.Y < FLOOR_Y then
-			stand = Vector3.new(stand.X, FLOOR_Y, stand.Z)
-		end
 		local threatMob = nearbyThreatMob()
 		if threatMob then
 			local mobRoot = threatMob.HumanoidRootPart
