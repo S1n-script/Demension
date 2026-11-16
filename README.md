@@ -1092,15 +1092,21 @@ local function hookRetry()
 	end
 end
 if flagOn("pending_raid") and game.PlaceId == RAID_LOBBY_ID then
-	task.delay(8, function()
-		local ok = pcall(function()
-			return startMap(raidPick, raidDifficulty, false)
-		end)
-		if ok then
-			setFlag("pending_raid", false)
-			notify("Starting raid: " .. tostring(raidPick))
+	task.delay(6, function()
+		local circles = workspace:WaitForChild("InteractionCircles", 10)
+		local portal2 = circles and circles:WaitForChild("RaidPortal2", 10)
+		if portal2 then
+			local ok = pcall(function()
+				return startMap(raidPick, raidDifficulty, false)
+			end)
+			if ok then
+				setFlag("pending_raid", false)
+				notify("Starting raid: " .. tostring(raidPick))
+			else
+				notify("Raid start failed, will retry")
+			end
 		else
-			notify("Raid start failed, will retry")
+			notify("Raid lobby not ready")
 		end
 	end)
 end
